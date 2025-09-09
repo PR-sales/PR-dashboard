@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Prospecção B2B</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Neutral Professional -->
+    <!-- Application Structure Plan: A unified single-page dashboard. The top features key performance indicators (KPIs) for an immediate overview. The main section uses a two-column grid: interactive charts (Funil de Vendas, Receita Potencial) on the left, and a filterable, dynamic list of all prospects on the right. A modal is used for adding/editing prospects. This integrated structure was chosen over separate tabs to provide a seamless workflow, allowing the user to see the high-level impact of their data changes and filtering in real-time, which is crucial for a fast-paced sales role. -->
+    <!-- Visualization & Content Choices: Report Info: Prospect KPIs -> Goal: Inform -> Viz/Presentation: Large text in styled cards -> Interaction: Dynamic updates -> Justification: Quick, scannable overview. | Report Info: Prospects per sales stage -> Goal: Compare -> Viz/Presentation: Horizontal Bar Chart (Chart.js) -> Interaction: Tooltips, filtering -> Justification: Clear comparison of quantities in each stage. | Report Info: Potential revenue per stage -> Goal: Compare -> Viz/Presentation: Horizontal Bar Chart (Chart.js) -> Interaction: Tooltips, filtering -> Justification: Shows monetary value at stake in each stage. | Report Info: Full prospect list -> Goal: Organize/Inform -> Viz/Presentation: Interactive HTML cards -> Interaction: Filtering, sorting, add/edit via modals -> Justification: Provides detailed, actionable data that can be easily managed. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 350px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .modal-backdrop {
+            transition: opacity 0.3s ease;
+        }
+        .modal-content {
+            transition: transform 0.3s ease;
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div id="app" class="p-4 md:p-8 max-w-7xl mx-auto">
+
+        <header class="mb-8">
+            <div class="flex items-center space-x-4 mb-2">
+                <!-- Aumentado o tamanho do logo para compensar o espaço em branco na imagem e alinhar com o título -->
+                <img src="https://drive.google.com/thumbnail?id=18AL38bZ7VF3jFHBEPMqFWOuxjdOPTEt0" alt="Logotipo da empresa" class="h-14 md:h-16 w-auto">
+                <div>
+                    <!-- Redimensionado o título para ficar em uma única linha em telas menores -->
+                    <h1 class="text-3xl md:text-4xl font-bold text-gray-800">Dashboard de Prospecção B2B</h1>
+                    <p class="text-gray-500 mt-1">Analise seu funil de vendas e gerencie seus contatos de forma eficiente.</p>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <section id="kpis" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h3 class="text-sm font-medium text-gray-500">Total de Prospecções</h3>
+                    <p id="totalProspects" class="text-3xl font-bold text-blue-600 mt-2">0</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h3 class="text-sm font-medium text-gray-500">Receita Potencial Total</h3>
+                    <p id="totalRevenue" class="text-3xl font-bold text-green-600 mt-2">R$ 0,00</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h3 class="text-sm font-medium text-gray-500">Negócios Fechados (Mês)</h3>
+                    <p id="dealsClosed" class="text-3xl font-bold text-purple-600 mt-2">0</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h3 class="text-sm font-medium text-gray-500">Taxa de Conversão</h3>
+                    <p id="conversionRate" class="text-3xl font-bold text-orange-500 mt-2">0%</p>
+                </div>
+            </section>
+            
+            <section class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                <div class="lg:col-span-3 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h2 class="text-xl font-bold mb-1">Análise do Funil</h2>
+                    <p class="text-sm text-gray-500 mb-6">Visualize a distribuição de prospecções e receita em cada etapa.</p>
+                    <div class="space-y-8">
+                        <div>
+                            <h3 class="font-semibold text-center mb-2">Funil de Vendas por Status</h3>
+                            <div class="chart-container">
+                                <canvas id="funnelChart"></canvas>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-center mb-2">Receita Potencial por Status</h3>
+                            <div class="chart-container">
+                                <canvas id="revenueChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+                         <h2 class="text-xl font-bold">Lista de Prospecções</h2>
+                         <button id="addProspectBtn" class="w-full sm:w-auto bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                            + Adicionar
+                         </button>
+                    </div>
+                   
+                    <div class="mb-4 space-y-3 sm:space-y-0 sm:flex sm:space-x-4">
+                        <div class="flex-1">
+                            <label for="statusFilter" class="text-sm font-medium text-gray-700 block mb-1">Filtrar por Status</label>
+                            <select id="statusFilter" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="all">Todos</option>
+                            </select>
+                        </div>
+                        <div class="flex-1">
+                            <label for="sectorFilter" class="text-sm font-medium text-gray-700 block mb-1">Filtrar por Setor</label>
+                            <select id="sectorFilter" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="all">Todos</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="prospectList" class="space-y-4 overflow-y-auto" style="max-height: 800px;">
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="prospectModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-50 hidden modal-backdrop">
+        <div class="modal-content bg-white w-full max-w-2xl rounded-xl shadow-2xl p-6 md:p-8 transform scale-95">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="modalTitle" class="text-2xl font-bold">Adicionar Nova Prospecção</h2>
+                <button id="closeModalBtn" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+            </div>
+            <form id="prospectForm" class="space-y-4">
+                <input type="hidden" id="prospectId">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="empresa" class="block text-sm font-medium text-gray-700">Empresa</label>
+                        <input type="text" id="empresa" required class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="contato" class="block text-sm font-medium text-gray-700">Contato</label>
+                        <input type="text" id="contato" required class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div>
+                        <label for="cargo" class="block text-sm font-medium text-gray-700">Cargo</label>
+                        <input type="text" id="cargo" class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="setor" class="block text-sm font-medium text-gray-700">Setor</label>
+                        <input type="text" id="setor" required class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="fonte" class="block text-sm font-medium text-gray-700">Fonte</label>
+                        <input type="text" id="fonte" class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                         <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
+                         <select id="status" required class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"></select>
+                    </div>
+                </div>
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="valorPotencial" class="block text-sm font-medium text-gray-700">Valor Potencial (R$)</label>
+                        <input type="number" id="valorPotencial" required class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                         <label for="probabilidade" class="block text-sm font-medium text-gray-700">Probabilidade de Fechamento (%)</label>
+                        <input type="number" id="probabilidade" min="0" max="100" class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+                <div>
+                     <label for="proximosPassos" class="block text-sm font-medium text-gray-700">Próximos Passos</label>
+                     <textarea id="proximosPassos" rows="2" class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>
+                </div>
+                 <div>
+                     <label for="notas" class="block text-sm font-medium text-gray-700">Notas</label>
+                     <textarea id="notas" rows="2" class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>
+                </div>
+                <div class="flex justify-end pt-4">
+                     <button type="submit" class="bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Custom Confirmation Modal -->
+    <div id="confirmationModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-50 hidden modal-backdrop">
+        <div class="bg-white rounded-xl shadow-2xl p-6 md:p-8 transform scale-95 transition-transform w-full max-w-sm text-center">
+            <p id="confirmationMessage" class="text-lg font-semibold mb-6">Tem certeza que deseja excluir esta prospecção?</p>
+            <div class="flex justify-center space-x-4">
+                <button id="confirmDeleteBtn" class="bg-red-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-red-700 transition-colors">Sim, Excluir</button>
+                <button id="cancelDeleteBtn" class="bg-gray-300 text-gray-800 font-semibold py-2 px-6 rounded-lg hover:bg-gray-400 transition-colors">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const STATUS_OPTIONS = [
+                "Qualificação", "Em Contato", "Reunião Agendada", "Proposta Enviada",
+                "Negociação", "Fechado - Ganho", "Fechado - Perdido", "Arquivado"
+            ];
+
+            const initialProspects = [
+                { id: 1, empresa: 'InovaTech Soluções', contato: 'Carlos Silva', cargo: 'Diretor de TI', setor: 'Tecnologia', fonte: 'LinkedIn', status: 'Proposta Enviada', valorPotencial: 50000, probabilidade: 75, dataAbertura: '2025-08-01', proximosPassos: 'Follow-up sobre a proposta na sexta-feira.', notas: 'Pareceram muito interessados na solução de BI.' },
+                { id: 2, empresa: 'Saúde & Bem-Estar Ltda', contato: 'Ana Pereira', cargo: 'Gerente de Compras', setor: 'Saúde', fonte: 'Indicação', status: 'Negociação', valorPotencial: 75000, probabilidade: 60, dataAbertura: '2025-07-15', proximosPassos: 'Aguardando ajuste de cláusulas contratuais.', notas: 'Cliente indicou que o preço é o principal ponto.' },
+                { id: 3, empresa: 'Varejo Global S.A.', contato: 'Mariana Costa', cargo: 'Gerente de Marketing', setor: 'Varejo', fonte: 'Evento', status: 'Fechado - Ganho', valorPotencial: 95000, probabilidade: 100, dataAbertura: '2025-06-20', proximosPassos: 'Kick-off do projeto agendado.', notas: 'Contrato assinado em 02/09.' },
+                { id: 4, empresa: 'Construtora Forte', contato: 'João Mendes', cargo: 'Engenheiro Chefe', setor: 'Construção', fonte: 'Cold Call', status: 'Qualificação', valorPotencial: 120000, probabilidade: 20, dataAbertura: '2025-09-02', proximosPassos: 'Enviar material de apresentação.', notas: 'Primeiro contato, mostrar valor.' },
+                { id: 5, empresa: 'Educa Mais Brasil', contato: 'Fernanda Lima', cargo: 'Coordenadora Pedagógica', setor: 'Educação', fonte: 'LinkedIn', status: 'Arquivado', valorPotencial: 30000, probabilidade: 0, dataAbertura: '2025-05-10', proximosPassos: 'Reativar em 6 meses.', notas: 'Sem orçamento para este semestre.' },
+                { id: 6, empresa: 'Logística Eficiente', contato: 'Ricardo Alves', cargo: 'Diretor de Operações', setor: 'Logística', fonte: 'Indicação', status: 'Fechado - Perdido', valorPotencial: 60000, probabilidade: 0, dataAbertura: '2025-07-22', proximosPassos: '', notas: 'Optaram por uma solução concorrente por preço.' },
+                { id: 7, empresa: 'Agro Forte S.A', contato: 'Lucas Martins', cargo: 'Gerente Agrícola', setor: 'Agronegócio', fonte: 'Feira', status: 'Reunião Agendada', valorPotencial: 250000, probabilidade: 50, dataAbertura: '2025-08-18', proximosPassos: 'Preparar apresentação para a reunião.', notas: 'Prospect com grande potencial.' },
+            ];
+            
+            let prospects = JSON.parse(localStorage.getItem('prospects')) || initialProspects;
+            let funnelChart, revenueChart;
+
+            const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
+            const statusColors = {
+                'Qualificação': 'rgba(59, 130, 246, 0.7)',
+                'Em Contato': 'rgba(34, 197, 94, 0.7)',
+                'Reunião Agendada': 'rgba(234, 179, 8, 0.7)',
+                'Proposta Enviada': 'rgba(249, 115, 22, 0.7)',
+                'Negociação': 'rgba(168, 85, 247, 0.7)',
+                'Fechado - Ganho': 'rgba(21, 128, 61, 0.7)',
+                'Fechado - Perdido': 'rgba(220, 38, 38, 0.7)',
+                'Arquivado': 'rgba(107, 114, 128, 0.7)'
+            };
+
+            const statusBorderColors = {
+                'Qualificação': 'rgb(59, 130, 246)',
+                'Em Contato': 'rgb(34, 197, 94)',
+                'Reunião Agendada': 'rgb(234, 179, 8)',
+                'Proposta Enviada': 'rgb(249, 115, 22)',
+                'Negociação': 'rgb(168, 85, 247)',
+                'Fechado - Ganho': 'rgb(21, 128, 61)',
+                'Fechado - Perdido': 'rgb(220, 38, 38)',
+                'Arquivado': 'rgb(107, 114, 128)'
+            };
+
+            const updateKPIs = (data) => {
+                const totalProspects = data.length;
+                const totalRevenue = data.reduce((sum, p) => sum + p.valorPotencial, 0);
+                
+                const currentMonth = new Date().getMonth();
+                const currentYear = new Date().getFullYear();
+                
+                const closedThisMonth = prospects.filter(p => {
+                    const date = new Date(p.dataAbertura);
+                    return p.status === 'Fechado - Ganho' && date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+                }).length;
+                
+                const closedWon = data.filter(p => p.status === 'Fechado - Ganho').length;
+                const conversionRate = totalProspects > 0 ? ((closedWon / totalProspects) * 100).toFixed(1) : 0;
+
+                document.getElementById('totalProspects').textContent = totalProspects;
+                document.getElementById('totalRevenue').textContent = formatCurrency(totalRevenue);
+                document.getElementById('dealsClosed').textContent = closedThisMonth;
+                document.getElementById('conversionRate').textContent = `${conversionRate}%`;
+            };
+
+            const renderProspectList = (data) => {
+                const listEl = document.getElementById('prospectList');
+                listEl.innerHTML = '';
+                if (data.length === 0) {
+                    listEl.innerHTML = `<p class="text-gray-500 text-center py-8">Nenhuma prospecção encontrada.</p>`;
+                    return;
+                }
+                data.forEach(p => {
+                    const card = document.createElement('div');
+                    card.className = 'border border-gray-200 p-4 rounded-lg bg-gray-50';
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h4 class="font-bold text-lg text-gray-800">${p.empresa}</h4>
+                                <p class="text-sm text-gray-600">${p.contato} - ${p.cargo}</p>
+                            </div>
+                            <span class="text-xs font-semibold px-2 py-1 rounded-full" style="background-color: ${statusColors[p.status]}; color: #fff;">
+                                ${p.status}
+                            </span>
+                        </div>
+                        <div class="mt-3 text-sm space-y-2">
+                            <p><strong class="font-semibold">Valor:</strong> ${formatCurrency(p.valorPotencial)}</p>
+                            <p><strong class="font-semibold">Próximo Passo:</strong> ${p.proximosPassos || 'N/D'}</p>
+                        </div>
+                        <div class="mt-4 flex justify-end space-x-2">
+                            <button class="edit-btn text-sm text-blue-600 hover:underline" data-id="${p.id}">Editar</button>
+                            <button class="delete-btn text-sm text-red-600 hover:underline" data-id="${p.id}">Excluir</button>
+                        </div>
+                    `;
+                    listEl.appendChild(card);
+                });
+            };
+
+            const updateCharts = (data) => {
+                const statusCounts = STATUS_OPTIONS.reduce((acc, status) => ({ ...acc, [status]: 0 }), {});
+                const statusRevenues = STATUS_OPTIONS.reduce((acc, status) => ({ ...acc, [status]: 0 }), {});
+
+                data.forEach(p => {
+                    statusCounts[p.status]++;
+                    statusRevenues[p.status] += p.valorPotencial;
+                });
+
+                const chartLabels = STATUS_OPTIONS;
+                const chartDataFunnel = chartLabels.map(label => statusCounts[label]);
+                const chartDataRevenue = chartLabels.map(label => statusRevenues[label]);
+
+                if (funnelChart) funnelChart.destroy();
+                funnelChart = new Chart(document.getElementById('funnelChart').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            label: 'Nº de Prospecções',
+                            data: chartDataFunnel,
+                            backgroundColor: chartLabels.map(l => statusColors[l]),
+                            borderColor: chartLabels.map(l => statusBorderColors[l]),
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { x: { beginAtZero: true } }
+                    }
+                });
+
+                if (revenueChart) revenueChart.destroy();
+                revenueChart = new Chart(document.getElementById('revenueChart').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            label: 'Receita Potencial',
+                            data: chartDataRevenue,
+                            backgroundColor: chartLabels.map(l => statusColors[l]),
+                            borderColor: chartLabels.map(l => statusBorderColors[l]),
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { x: { beginAtZero: true } },
+                        tooltips: {
+                            callbacks: {
+                                label: function(tooltipItem, data) {
+                                    return formatCurrency(tooltipItem.xLabel);
+                                }
+                            }
+                        }
+                    }
+                });
+            };
+            
+            const applyFiltersAndRender = () => {
+                const statusFilter = document.getElementById('statusFilter').value;
+                const sectorFilter = document.getElementById('sectorFilter').value;
+                
+                let filteredData = prospects;
+                if (statusFilter !== 'all') {
+                    filteredData = filteredData.filter(p => p.status === statusFilter);
+                }
+                if (sectorFilter !== 'all') {
+                    filteredData = filteredData.filter(p => p.setor === sectorFilter);
+                }
+
+                updateKPIs(filteredData);
+                renderProspectList(filteredData);
+                updateCharts(filteredData);
+                localStorage.setItem('prospects', JSON.stringify(prospects));
+            };
+            
+            const setupFilters = () => {
+                const statusFilter = document.getElementById('statusFilter');
+                const sectorFilter = document.getElementById('sectorFilter');
+                const statusFormSelect = document.getElementById('status');
+
+                STATUS_OPTIONS.forEach(s => {
+                    statusFilter.add(new Option(s, s));
+                    statusFormSelect.add(new Option(s, s));
+                });
+                
+                const sectors = [...new Set(prospects.map(p => p.setor))];
+                sectors.forEach(s => sectorFilter.add(new Option(s, s)));
+
+                statusFilter.addEventListener('change', applyFiltersAndRender);
+                sectorFilter.addEventListener('change', applyFiltersAndRender);
+            };
+
+            const modal = document.getElementById('prospectModal');
+            const form = document.getElementById('prospectForm');
+            const openModal = (prospect = null) => {
+                form.reset();
+                if (prospect) {
+                    document.getElementById('modalTitle').textContent = 'Editar Prospecção';
+                    document.getElementById('prospectId').value = prospect.id;
+                    document.getElementById('empresa').value = prospect.empresa;
+                    document.getElementById('contato').value = prospect.contato;
+                    document.getElementById('cargo').value = prospect.cargo;
+                    document.getElementById('setor').value = prospect.setor;
+                    document.getElementById('fonte').value = prospect.fonte;
+                    document.getElementById('status').value = prospect.status;
+                    document.getElementById('valorPotencial').value = prospect.valorPotencial;
+                    document.getElementById('probabilidade').value = prospect.probabilidade;
+                    document.getElementById('proximosPassos').value = prospect.proximosPassos;
+                    document.getElementById('notas').value = prospect.notas;
+                } else {
+                    document.getElementById('modalTitle').textContent = 'Adicionar Nova Prospecção';
+                    document.getElementById('prospectId').value = '';
+                }
+                modal.classList.remove('hidden');
+                setTimeout(() => modal.querySelector('.modal-content').classList.add('scale-100'), 10);
+            };
+
+            const closeModal = () => {
+                modal.querySelector('.modal-content').classList.remove('scale-100');
+                setTimeout(() => modal.classList.add('hidden'), 300);
+            };
+            
+            document.getElementById('addProspectBtn').addEventListener('click', () => openModal());
+            document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => {
+                if(e.target === modal) closeModal();
+            });
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const id = document.getElementById('prospectId').value;
+                const prospectData = {
+                    empresa: document.getElementById('empresa').value,
+                    contato: document.getElementById('contato').value,
+                    cargo: document.getElementById('cargo').value,
+                    setor: document.getElementById('setor').value,
+                    fonte: document.getElementById('fonte').value,
+                    status: document.getElementById('status').value,
+                    valorPotencial: parseFloat(document.getElementById('valorPotencial').value),
+                    probabilidade: parseInt(document.getElementById('probabilidade').value),
+                    proximosPassos: document.getElementById('proximosPassos').value,
+                    notas: document.getElementById('notas').value
+                };
+
+                if (id) {
+                    const index = prospects.findIndex(p => p.id == id);
+                    prospects[index] = { ...prospects[index], ...prospectData };
+                } else {
+                    prospectData.id = Date.now();
+                    prospectData.dataAbertura = new Date().toISOString().split('T')[0];
+                    prospects.push(prospectData);
+                }
+                closeModal();
+                applyFiltersAndRender();
+            });
+            
+            const confirmationModal = document.getElementById('confirmationModal');
+            const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+            const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+            const confirmationMessage = document.getElementById('confirmationMessage');
+            let deleteCallback = null;
+
+            const showConfirmation = (message, onConfirm) => {
+                confirmationMessage.textContent = message;
+                deleteCallback = onConfirm;
+                confirmationModal.classList.remove('hidden');
+                setTimeout(() => confirmationModal.querySelector('div').classList.add('scale-100'), 10);
+            };
+
+            const hideConfirmation = () => {
+                confirmationModal.querySelector('div').classList.remove('scale-100');
+                setTimeout(() => confirmationModal.classList.add('hidden'), 300);
+            };
+            
+            confirmDeleteBtn.addEventListener('click', () => {
+                if (deleteCallback) {
+                    deleteCallback();
+                }
+                hideConfirmation();
+            });
+
+            cancelDeleteBtn.addEventListener('click', hideConfirmation);
+
+            confirmationModal.addEventListener('click', (e) => {
+                if (e.target === confirmationModal) {
+                    hideConfirmation();
+                }
+            });
+
+            document.getElementById('prospectList').addEventListener('click', (e) => {
+                const id = e.target.dataset.id;
+                if (!id) return;
+
+                if (e.target.classList.contains('edit-btn')) {
+                    const prospect = prospects.find(p => p.id == id);
+                    openModal(prospect);
+                }
+
+                if (e.target.classList.contains('delete-btn')) {
+                    showConfirmation('Tem certeza que deseja excluir esta prospecção?', () => {
+                        prospects = prospects.filter(p => p.id != id);
+                        applyFiltersAndRender();
+                    });
+                }
+            });
+
+            setupFilters();
+            applyFiltersAndRender();
+        });
+    </script>
+</body>
+</html>
